@@ -14,7 +14,7 @@ import {
   Box,
 } from "@mui/material";
 import DeleteIcon from "@mui/icons-material/Delete";
-import EditIcon from "@mui/icons-material/Edit"; // Import Edit Icon
+import EditIcon from "@mui/icons-material/Edit";
 
 function AdminDashboard() {
   const [menu, setMenu] = useState([]);
@@ -24,43 +24,73 @@ function AdminDashboard() {
     description: "",
     category: "",
   });
-  const [editId, setEditId] = useState(null); // Track if we are editing
+  const [imageFile, setImageFile] = useState(null); // For file upload
+  const [editId, setEditId] = useState(null);
 
   const token = localStorage.getItem("token");
 
+  // Fetch menu items from backend
   const fetchMenu = async () => {
-    const res = await axios.get("http://localhost:5000/api/menu");
-    setMenu(res.data);
+    try {
+      const res = await axios.get(
+        "https://hotelserver-q5lo.onrender.com/api/menu",
+      );
+      setMenu(res.data);
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => {
     fetchMenu();
   }, []);
 
-  // Handle Form Submission (Both Add and Update)
+  // Handle Add / Update
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
+      const data = new FormData();
+      data.append("name", formData.name);
+      data.append("price", formData.price);
+      data.append("category", formData.category);
+      data.append("description", formData.description);
+      if (imageFile) data.append("image", imageFile);
+
       if (editId) {
-        // UPDATE Logic
-        await axios.put(`http://localhost:5000/api/menu/${editId}`, formData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.put(
+          `https://hotelserver-q5lo.onrender.com/api/menu/${editId}`,
+          data,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
         setEditId(null);
       } else {
-        // ADD Logic
-        await axios.post("http://localhost:5000/api/menu", formData, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
+        await axios.post(
+          "https://hotelserver-q5lo.onrender.com/api/menu",
+          data,
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              "Content-Type": "multipart/form-data",
+            },
+          },
+        );
       }
-      fetchMenu();
+
       setFormData({ name: "", price: "", description: "", category: "" });
+      setImageFile(null);
+      fetchMenu();
     } catch (err) {
+      console.error(err);
       alert("Action failed. Check console.");
     }
   };
 
-  // Prepare form for editing
+  // Prepare edit
   const startEdit = (item) => {
     setEditId(item._id);
     setFormData({
@@ -69,14 +99,23 @@ function AdminDashboard() {
       description: item.description,
       category: item.category,
     });
+    setImageFile(null); // Clear file input
   };
 
+  // Delete menu
   const handleDelete = async (id) => {
     if (window.confirm("Delete this item?")) {
-      await axios.delete(`http://localhost:5000/api/menu/${id}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      fetchMenu();
+      try {
+        await axios.delete(
+          `https://hotelserver-q5lo.onrender.com/api/menu/${id}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          },
+        );
+        fetchMenu();
+      } catch (err) {
+        console.error(err);
+      }
     }
   };
 
@@ -86,6 +125,7 @@ function AdminDashboard() {
         Admin Panel
       </Typography>
 
+      {/* Form */}
       <Paper sx={{ p: 3, mb: 4, backgroundColor: editId ? "#fff9c4" : "#fff" }}>
         <Typography variant="h6">
           {editId ? "Edit Item" : "Add New Item"}
@@ -130,6 +170,18 @@ function AdminDashboard() {
             }
             required
           />
+          <TextField
+            type="file"
+            size="small"
+            onChange={(e) => setImageFile(e.target.files[0])}
+          />
+          {imageFile && (
+            <img
+              src={URL.createObjectURL(imageFile)}
+              alt="Preview"
+              style={{ width: 100, marginTop: 10, borderRadius: 5 }}
+            />
+          )}
 
           <Button
             variant="contained"
@@ -149,6 +201,7 @@ function AdminDashboard() {
                   description: "",
                   category: "",
                 });
+                setImageFile(null);
               }}
             >
               Cancel
@@ -157,11 +210,19 @@ function AdminDashboard() {
         </Box>
       </Paper>
 
+      {/* Menu Table */}
       <Table component={Paper}>
         <TableBody>
           {menu.map((item) => (
             <TableRow key={item._id}>
               <TableCell>
+                {item.image && (
+                  <img
+                    src={item.image}
+                    alt={item.name}
+                    style={{ width: 80, borderRadius: 5, marginRight: 10 }}
+                  />
+                )}
                 <b>{item.name}</b>
               </TableCell>
               <TableCell>${item.price}</TableCell>
